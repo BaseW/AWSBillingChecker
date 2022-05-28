@@ -1,5 +1,5 @@
 [package]
-name = "AWSBillingChecker"
+name = "aws_billing_checker"
 version = "0.1.0"
 edition = "2021"
 
