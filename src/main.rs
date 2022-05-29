@@ -1,4 +1,5 @@
-use aws_lambda_events::event::cloudwatch_logs::CloudwatchLogsEvent;use lambda_runtime::{run, service_fn, Error, LambdaEvent};
+use aws_lambda_events::event::cloudwatch_logs::{CloudwatchLogsEvent, CloudwatchLogsRawData};
+use lambda_runtime::{self, run, service_fn, Error, LambdaEvent};
 
 /// This is the main body for the function.
 /// Write your code inside it.
@@ -23,4 +24,19 @@ async fn main() -> Result<(), Error> {
         .init();
 
     run(service_fn(function_handler)).await
+}
+
+#[tokio::test]
+async fn test_my_lambda_handler() {
+    let aws_logs = CloudwatchLogsRawData {
+        data: Some("".to_string()),
+    };
+    let input = CloudwatchLogsEvent { aws_logs };
+    let context = lambda_runtime::Context::default();
+
+    let event = lambda_runtime::LambdaEvent::new(input, context);
+
+    function_handler(event)
+        .await
+        .expect("failed to handle event");
 }
