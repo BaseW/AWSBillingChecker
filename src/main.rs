@@ -1,29 +1,77 @@
 use aws_config::meta::region::RegionProviderChain;
-use aws_lambda_events::event::cloudwatch_logs::{CloudwatchLogsEvent, CloudwatchLogsRawData};
-use aws_sdk_billingconductor::Client;
+use aws_lambda_events::event::cloudwatch_logs::CloudwatchLogsEvent;
+use aws_sdk_costexplorer::{
+    model::{DateInterval, Granularity},
+    Client,
+};
 use lambda_runtime::{self, run, service_fn, Error, LambdaEvent};
 
-/// This is the main body for the function.
-/// Write your code inside it.
-/// There are some code example in the following URLs:
-/// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/lambda-runtime/examples
-/// - https://github.com/aws-samples/serverless-rust-demo/
-async fn function_handler(event: LambdaEvent<CloudwatchLogsEvent>) -> Result<(), Error> {
-    // Extract some useful information from the request
-
-    Ok(())
-}
-
-async fn pricing_rules_handler(event: LambdaEvent<CloudwatchLogsEvent>) -> Result<(), Error> {
+async fn example_handler(event: LambdaEvent<CloudwatchLogsEvent>) -> Result<(), Error> {
     let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
     let config = aws_config::from_env().region(region_provider).load().await;
     let client = Client::new(&config);
-    let list_pricing_rules = client.list_pricing_rules();
-    let pricing_rules_result = list_pricing_rules.send().await;
-    match pricing_rules_result {
-        Ok(pricing_rules) => println!("pricing_rules: {:?}", pricing_rules),
-        Err(err) => println!("err: {:?}", err),
-    };
+
+    let start_date: String = "2022-01-01".to_string();
+    let end_date: String = "2022-06-01".to_string();
+
+    let date_interval_builder = DateInterval::builder();
+    let date_interval = date_interval_builder
+        .set_start(Some(start_date))
+        .set_end(Some(end_date))
+        .build();
+
+    let granularity = Granularity::Monthly;
+    let mut metrics = Vec::<String>::new();
+    metrics.push("UnblendedCost".to_string());
+
+    let get_cost_and_usage = client
+        .get_cost_and_usage()
+        .set_time_period(Some(date_interval))
+        .set_granularity(Some(granularity))
+        .set_metrics(Some(metrics));
+    let cost_and_usage_result = get_cost_and_usage.send().await;
+    match cost_and_usage_result {
+        Ok(cost_and_usage) => {
+            // println!("cost_and_usage: {:?}", cost_and_usage);
+            match cost_and_usage.results_by_time {
+                Some(results_by_time) => {
+                    // println!("results_by_time: {:?}", results_by_time);
+                    for result_by_time in results_by_time {
+                        match result_by_time.time_period {
+                            Some(date_interval) => {
+                                println!("date_interval: {:?}", date_interval);
+                                match result_by_time.total {
+                                    Some(total) => {
+                                        // println!("total: {:?}", total);
+                                        match total.get("UnblendedCost") {
+                                            Some(unblended_cost) => {
+                                                println!("unblended_cost: {:?}", unblended_cost);
+                                            }
+                                            _ => {
+                                                println!("no unblended cost");
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        println!("no total");
+                                    }
+                                }
+                            }
+                            _ => {
+                                println!("no date_interval");
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    println!("no result");
+                }
+            }
+        }
+        Err(err) => {
+            println!("error: {:?}", err);
+        }
+    }
 
     Ok(())
 }
@@ -39,11 +87,13 @@ async fn main() -> Result<(), Error> {
         .without_time()
         .init();
 
-    run(service_fn(function_handler)).await
+    run(service_fn(example_handler)).await
 }
 
 #[tokio::test]
 async fn test_my_lambda_handler() {
+    use aws_lambda_events::event::cloudwatch_logs::CloudwatchLogsRawData;
+
     let aws_logs = CloudwatchLogsRawData {
         data: Some("".to_string()),
     };
@@ -52,8 +102,5 @@ async fn test_my_lambda_handler() {
 
     let event = lambda_runtime::LambdaEvent::new(input, context);
 
-    // function_handler(event)
-    //     .await
-    //     .expect("failed to handle event");
-    pricing_rules_handler(event).await.expect("failed to fetch");
+    example_handler(event).await.expect("failed to fetch");
 }
