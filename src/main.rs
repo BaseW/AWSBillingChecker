@@ -39,21 +39,46 @@ async fn example_handler(event: LambdaEvent<CloudwatchLogsEvent>) -> Result<(), 
                     for result_by_time in results_by_time {
                         match result_by_time.time_period {
                             Some(date_interval) => {
-                                println!("date_interval: {:?}", date_interval);
-                                match result_by_time.total {
-                                    Some(total) => {
-                                        // println!("total: {:?}", total);
-                                        match total.get("UnblendedCost") {
-                                            Some(unblended_cost) => {
-                                                println!("unblended_cost: {:?}", unblended_cost);
+                                // println!("date_interval: {:?}", date_interval);
+                                if let Some(start_date) = date_interval.start {
+                                    if let Some(end_date) = date_interval.end {
+                                        match result_by_time.total {
+                                            Some(total) => {
+                                                // println!("total: {:?}", total);
+                                                match total.get("UnblendedCost") {
+                                                    Some(unblended_cost) => {
+                                                        // println!("unblended_cost: {:?}", unblended_cost);
+                                                        if let Some(amount) =
+                                                            unblended_cost.amount.as_ref()
+                                                        {
+                                                            if let Some(unit) =
+                                                                unblended_cost.unit.as_ref()
+                                                            {
+                                                                let owned_amount =
+                                                                    amount.as_str().to_string();
+                                                                let owned_unit =
+                                                                    unit.as_str().to_string();
+                                                                println!(
+                                                                    "{:?}: {:?}",
+                                                                    start_date
+                                                                        + " ~ "
+                                                                        + end_date.as_str(),
+                                                                    owned_amount
+                                                                        + " "
+                                                                        + owned_unit.as_str()
+                                                                );
+                                                            }
+                                                        }
+                                                    }
+                                                    _ => {
+                                                        println!("no unblended cost");
+                                                    }
+                                                }
                                             }
                                             _ => {
-                                                println!("no unblended cost");
+                                                println!("no total");
                                             }
                                         }
-                                    }
-                                    _ => {
-                                        println!("no total");
                                     }
                                 }
                             }
